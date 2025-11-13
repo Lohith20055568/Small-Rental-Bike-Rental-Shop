@@ -1,33 +1,127 @@
-const sqlite3 = require('sqlite3').verbose();
+const express = require("express");
+const cors = require("cors");
+const db = require("./db.js"); 
 
-// Use a file for persistent storage (replace rental.db with your preferred name)
-const DBSOURCE = "rental.db"; 
+const app = express();
+const HTTP_PORT = 8000;
 
-let db = new sqlite3.Database(DBSOURCE, (err) => {
-    if (err) {
-        // Cannot open database
-        console.error(err.message);
-        throw err;
-    } else {
-        console.log('Connected to the SQLite database.');
-        // SQL to create the 'items' table if it doesn't exist
-        db.run(`CREATE TABLE IF NOT EXISTS items (
-            ItemID INTEGER PRIMARY KEY AUTOINCREMENT,
-            Name TEXT NOT NULL,
-            Category TEXT,
-            DailyRate REAL NOT NULL,
-            Status TEXT NOT NULL, 
-            Condition TEXT,
-            LastServiceDate TEXT
-        )`, (err) => {
-            if (err) {
-                // Table already created
-            } else {
-                // Table just created, optionally insert initial data for testing
-                console.log('Items table created (or already exists).');
-            }
-        });
-    }
+app.use(cors()); 
+app.use(express.json()); 
+
+// --- Server Start ---
+app.listen(HTTP_PORT, () => {
+    console.log(`Server running on port ${HTTP_PORT}`);
 });
 
-module.exports = db;
+// --- Root Endpoint ---
+app.get("/", (req, res, next) => {
+    res.json({ "message": "API Status: OK" });
+});
+
+app.post("/api/items", (req, res, next) => {
+    const { Name, Category, DailyRate, Status, Condition, LastServiceDate } = req.body;
+    
+    // Basic Validation
+    if (!Name || !DailyRate) {
+        res.status(400).json({ "error": "Missing required fields (Name or DailyRate)" });
+        return;
+    }
+
+    const sql = `INSERT INTO items (Name, Category, DailyRate, Status, Condition, LastServiceDate) 
+                 VALUES (?, ?, ?, ?, ?, ?)`;
+    const params = [
+        Name, 
+        Category || 'Uncategorized', 
+        DailyRate, 
+        Status || 'Available', 
+        Condition || 'Good',
+        LastServiceDate || new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    ];
+
+    db.run(sql, params, function (err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({
+            "message": "success",
+            "data": { ItemID: this.lastID, ...req.body }
+        });
+    });
+});
+
+
+
+app.get("/api/items", (req, res, next) => {
+    let sql = "SELECT * FROM items";
+    const params = [];
+    
+    
+    if (req.query.status) {
+        sql += " WHERE Status = ?";
+        params.push(req.query.status);
+    }
+    
+    db.all(sql, params, (err, rows) => {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({
+            "message": "success",
+            "data": rows
+        });
+    });
+});
+
+
+
+app.put("/api/items/:id", (req, res, next) => {
+    const { Name, Category, DailyRate, Status, Condition, LastServiceDate } = req.body;
+    const itemId = req.params.id;
+
+    const sql = `UPDATE items SET 
+                    Name = COALESCE(?,Name), 
+                    Category = COALESCE(?,Category), 
+                    DailyRate = COALESCE(?,DailyRate), 
+                    Status = COALESCE(?,Status), 
+                    Condition = COALESCE(?,Condition), 
+                    LastServiceDate = COALESCE(?,LastServiceDate)
+                 WHERE ItemID = ?`;
+    const params = [Name, Category, DailyRate, Status, Condition, LastServiceDate, itemId];
+
+    db.run(sql, params, function (err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({
+            "message": "success",
+            "changes": this.changes
+        });
+    });
+});
+
+
+
+app.delete("/api/items/:id", (req, res, next) => {
+    const itemId = req.params.id;
+    const sql = 'DELETE FROM items WHERE ItemID = ?';
+    
+    db.run(sql, itemId, function (err) {
+        if (err) {
+            res.status(400).json({ "error": err.message });
+            return;
+        }
+        res.json({ 
+            "message": "deleted", 
+            "changes": this.changes 
+        });
+    });
+});
+
+
+
+app.use(function(req, res){
+    res.status(404).json({ "error": "Endpoint not found" });
+});
