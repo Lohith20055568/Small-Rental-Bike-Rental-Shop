@@ -1,1 +1,253 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equipment Rental System PoC - Full CRUD</title>
+    <style>
+        /* Minimal CSS for readability and assignment focus */
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: auto; padding: 20px; }
+        .section { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; }
+        #resultsTable { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        #resultsTable th, #resultsTable td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .rented { background-color: #ffe0e0; } /* Styling for Rented items */
+        .maintenance { background-color: #ffffcc; } /* Styling for Maintenance items */
+        button { padding: 5px 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>Equipment Rental Management (PoC)</h1>
+    
+    <div class="section">
+        <h2>1. Create New Item (C)</h2>
+        <form id="create-form">
+            <label for="name">Name:</label><input type="text" id="name" required><br><br>
+            <label for="category">Category:</label><input type="text" id="category" value="Kayak"><br><br>
+            <label for="dailyRate">Daily Rate (€):</label><input type="number" id="dailyRate" step="0.01" min="0.01" required><br><br>
+            <label for="condition">Condition:</label>
+            <select id="condition">
+                <option value="Good">Good</option>
+                <option value="Needs Repair">Needs Repair</option>
+                <option value="New">New</option>
+            </select><br><br>
+            <button type="submit" style="background-color: #4CAF50; color: white;">CREATE Item</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>2. Inventory List & Reporting (R)</h2>
+        <button onclick="fetchAllItems()" style="background-color: #2196F3; color: white;">Refresh/Read All Items</button>
+        <button onclick="filterByStatus('Maintenance')" style="background-color: orange; color: white;">Filter: Maintenance Only (Report)</button>
+        <button onclick="filterByStatus('Rented')" style="background-color: #f44336; color: white;">Filter: Rented Items</button>
+        <div id="status-message" style="margin-top: 10px; color: green; font-weight: bold;"></div>
+        
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Rate (€)</th>
+                    <th>Status</th>
+                    <th>Actions (U & D)</th>
+                </tr>
+            </thead>
+            <tbody id="inventory-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/items';
+        const statusMessageEl = document.getElementById('status-message');
+        
+        // ==========================================================
+        // READ (R) OPERATIONS
+        // ==========================================================
+        
+        // Reads all items OR items filtered by status
+        async function fetchAllItems(filterStatus = null) {
+            let url = API_BASE_URL;
+            if (filterStatus) {
+                url += `?status=${filterStatus}`;
+            }
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (result.message === 'success') {
+                    renderTable(result.data);
+                    statusMessageEl.textContent = filterStatus 
+                        ? `Displaying ${result.data.length} items with status: ${filterStatus}`
+                        : `Successfully loaded ${result.data.length} total items.`;
+                } else {
+                    statusMessageEl.textContent = 'Error fetching data from API.';
+                }
+            } catch (error) {
+                statusMessageEl.textContent = 'Error connecting to the API. Ensure server.js is running.';
+                console.error('Fetch Error:', error);
+            }
+        }
+        
+        function filterByStatus(status) {
+            fetchAllItems(status);
+        }
+
+        // ==========================================================
+        // CREATE (C) OPERATION
+        // ==========================================================
+        
+        document.getElementById('create-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Client-side Validation (Additional Feature)
+            const dailyRate = parseFloat(document.getElementById('dailyRate').value);
+            if (dailyRate <= 0 || isNaN(dailyRate)) {
+                alert("Daily Rate must be a positive number.");
+                return;
+            }
+
+            const newItem = {
+                Name: document.getElementById('name').value,
+                Category: document.getElementById('category').value,
+                DailyRate: dailyRate,
+                Condition: document.getElementById('condition').value,
+                Status: 'Available' 
+            };
+            
+            try {
+                const response = await fetch(API_BASE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newItem)
+                });
+                
+                const result = await response.json();
+                if (response.ok) {
+                    statusMessageEl.textContent = `Item Created successfully! ID: ${result.data.ItemID}`;
+                    document.getElementById('create-form').reset(); // Clear form
+                    fetchAllItems(); 
+                } else {
+                    statusMessageEl.textContent = `Creation Failed: ${result.error}`;
+                }
+            } catch (error) {
+                statusMessageEl.textContent = 'Error creating item.';
+                console.error('Create Error:', error);
+            }
+        });
+
+
+        // ==========================================================
+        // UPDATE (U) OPERATION
+        // ==========================================================
+        
+        // Integration Test/Key CRUD function: Toggles Status between Rented and Available
+        async function updateItemStatus(itemId, currentStatus) {
+            const newStatus = (currentStatus === 'Available' ? 'Rented' : 'Available');
+            
+            if (!confirm(`Are you sure you want to change item ${itemId} status to '${newStatus}'?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/${itemId}`, {
+                    method: 'PUT', // Uses the generic PUT endpoint
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ Status: newStatus })
+                });
+
+                if (response.ok) {
+                    statusMessageEl.textContent = `Item ${itemId} status updated to: ${newStatus}`;
+                    fetchAllItems(); // Refresh the table
+                } else {
+                    statusMessageEl.textContent = `Failed to update item ${itemId}.`;
+                }
+            } catch (error) {
+                statusMessageEl.textContent = 'Error updating item status.';
+                console.error('Update Error:', error);
+            }
+        }
+
+
+        // ==========================================================
+        // DELETE (D) OPERATION
+        // ==========================================================
+        
+        async function deleteItem(itemId, itemName) {
+            if (!confirm(`CONFIRM DELETION: Are you sure you want to permanently remove item: ${itemName} (ID: ${itemId})?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/${itemId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    statusMessageEl.textContent = `Item ${itemName} (ID: ${itemId}) successfully DELETED.`;
+                    fetchAllItems(); // Refresh the table
+                } else {
+                    statusMessageEl.textContent = `Failed to delete item ${itemId}.`;
+                }
+            } catch (error) {
+                statusMessageEl.textContent = 'Error deleting item.';
+                console.error('Delete Error:', error);
+            }
+        }
+
+        // ==========================================================
+        // RENDER TABLE & INITIAL LOAD
+        // ==========================================================
+
+        function renderTable(items) {
+            const body = document.getElementById('inventory-body');
+            body.innerHTML = ''; // Clear existing rows
+            
+            items.forEach(item => {
+                const row = body.insertRow();
+                // Add styling class based on status (Additional Feature)
+                if (item.Status === 'Rented') {
+                    row.classList.add('rented');
+                } else if (item.Status === 'Maintenance') {
+                    row.classList.add('maintenance');
+                }
+
+                row.insertCell().textContent = item.ItemID;
+                row.insertCell().textContent = item.Name;
+                row.insertCell().textContent = item.Category;
+                row.insertCell().textContent = item.DailyRate.toFixed(2); // Format currency
+                row.insertCell().textContent = item.Status;
+                
+                // ACTION BUTTONS (U and D)
+                const actionCell = row.insertCell();
+                
+                // 1. Quick Status Update Button (U)
+                const statusBtn = document.createElement('button');
+                statusBtn.textContent = (item.Status === 'Available' ? 'RENT IT' : 
+                                        (item.Status === 'Rented' ? 'RETURN' : 'MAINTENANCE'));
+                statusBtn.style.backgroundColor = (item.Status === 'Available' ? '#007bff' : '#6c757d');
+                statusBtn.style.color = 'white';
+                
+                // NOTE: If status is Maintenance, we allow switching to Available/Rented for simplicity
+                statusBtn.onclick = () => updateItemStatus(item.ItemID, item.Status);
+                actionCell.appendChild(statusBtn);
+
+                // 2. Delete Button (D)
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'DELETE';
+                deleteBtn.style.marginLeft = '10px';
+                deleteBtn.style.backgroundColor = '#dc3545';
+                deleteBtn.style.color = 'white';
+                deleteBtn.onclick = () => deleteItem(item.ItemID, item.Name);
+                actionCell.appendChild(deleteBtn);
+            });
+        }
+        
+        // Load data automatically when the page is fully loaded
+        document.addEventListener('DOMContentLoaded', fetchAllItems);
+    </script>
+</body>
+</html>
