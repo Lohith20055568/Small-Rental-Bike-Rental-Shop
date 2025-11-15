@@ -104,24 +104,4 @@ app.put("/api/items/:id", (req, res, next) => {
 
 
 
-app.delete("/api/items/:id", (req, res, next) => {
-    const itemId = req.params.id;
-    const sql = 'DELETE FROM items WHERE ItemID = ?';
-    
-    db.run(sql, itemId, function (err) {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({ 
-            "message": "deleted", 
-            "changes": this.changes 
-        });
-    });
-});
 
-
-
-app.use(function(req, res){
-    res.status(404).json({ "error": "Endpoint not found" });
-});
