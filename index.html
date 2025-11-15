@@ -224,26 +224,4 @@
                 // ACTION BUTTONS (U and D)
                 const actionCell = row.insertCell();
                 
-                // 1. Quick Status Update Button (U)
-                const statusBtn = document.createElement('button');
-                statusBtn.textContent = (item.Status === 'Available' ? 'RENT IT' : 
-                                        (item.Status === 'Rented' ? 'RETURN' : 'MAINTENANCE'));
-                statusBtn.style.backgroundColor = (item.Status === 'Available' ? '#007bff' : '#6c757d');
-                statusBtn.style.color = 'white';
-                
-                // NOTE: If status is Maintenance, we allow switching to Available/Rented for simplicity
-                statusBtn.onclick = () => updateItemStatus(item.ItemID, item.Status);
-                actionCell.appendChild(statusBtn);
-
-                // 2. Delete Button (D)
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'DELETE';
-                deleteBtn.style.marginLeft = '10px';
-                deleteBtn.style.backgroundColor = '#dc3545';
-                deleteBtn.style.color = 'white';
-                deleteBtn.onclick = () => deleteItem(item.ItemID, item.Name);
-                actionCell.appendChild(deleteBtn);
-            });
-        }
-        
-
+          
