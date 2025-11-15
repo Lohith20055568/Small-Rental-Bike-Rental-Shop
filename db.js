@@ -76,32 +76,4 @@ app.get("/api/items", (req, res, next) => {
 
 
 
-app.put("/api/items/:id", (req, res, next) => {
-    const { Name, Category, DailyRate, Status, Condition, LastServiceDate } = req.body;
-    const itemId = req.params.id;
-
-    const sql = `UPDATE items SET 
-                    Name = COALESCE(?,Name), 
-                    Category = COALESCE(?,Category), 
-                    DailyRate = COALESCE(?,DailyRate), 
-                    Status = COALESCE(?,Status), 
-                    Condition = COALESCE(?,Condition), 
-                    LastServiceDate = COALESCE(?,LastServiceDate)
-                 WHERE ItemID = ?`;
-    const params = [Name, Category, DailyRate, Status, Condition, LastServiceDate, itemId];
-
-    db.run(sql, params, function (err) {
-        if (err) {
-            res.status(400).json({ "error": err.message });
-            return;
-        }
-        res.json({
-            "message": "success",
-            "changes": this.changes
-        });
-    });
-});
-
-
-
 
