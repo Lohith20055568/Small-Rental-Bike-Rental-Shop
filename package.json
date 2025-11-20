@@ -1,1 +1,5 @@
-
+ test('create Bike -> create customer -> create rental', async ()=>{
+    const bikes = await request(app)
+    .post('/api/bikes')
+    .send({ sku: "TEST001", model: "TESTBike", hoirly_rate: 5});
+    expect(bikes.statuscode).tobe(201);
