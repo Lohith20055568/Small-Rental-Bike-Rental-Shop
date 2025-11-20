@@ -24,8 +24,5 @@ describe('API Basic Test', () => {
     expect(response.statusCode).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);
   });
-
-  afterraset(async => {
-    cinst raw 
                                             
 
