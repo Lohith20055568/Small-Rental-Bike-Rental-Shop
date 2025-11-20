@@ -24,5 +24,11 @@ describe('API Basic Test', () => {
     expect(response.statusCode).toBe(200);
     expect(Array.isArray(response.body)).toBe(true);
   });
+  test('create Bike -> create customer -> create rental', async ()=>{
+    const bikes = await request(app)
+    .post('/api/bikes')
+    .send({ sku: "TEST001", model: "TESTBike", hoirly_rate: 5});
+    expect(bikes.statuscode).tobe(201);
+    
                                             
 
