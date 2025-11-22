@@ -1,3 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Bike Rental</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --muted:#6b7280; --accent:#0b76ef;
+    --border:#e6e9ef; --radius:12px; --pad:18px;
+    --maxw:1100px;
+  }
+  body{
+    margin:0; font-family:Inter,system-ui; background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+    display:flex; justify-content:center; padding:28px 12px;
+  }
+  .wrap{width:100%; max-width:var(--maxw);}
+  header h1{margin:0; font-size:28px; letter-spacing:-0.3px;}
+  .card{background:var(--card); border-radius:var(--radius);
+    padding:var(--pad); border:1px solid var(--border);
+    box-shadow:0 2px 6px rgba(20,20,40,0.05); margin-bottom:18px;}
+  .section-title{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .section-title h2{margin:0; font-size:20px;}
+  form.inline{display:flex; gap:8px; flex-wrap:wrap;}
+  input, select{
+    padding:8px 10px; border-radius:8px; border:1px solid var(--border);
+    background:#fff; font-size:14px;
+  }
+  button{padding:8px 12px; border-radius:8px; cursor:pointer;
+    border:1px solid #cfd8e3; background:#fff; font-weight:600;}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  table{width:100%; border-collapse:collapse; font-size:15px;}
+  th,td{padding:10px 12px; border-bottom:1px solid #f1f3f7; text-align:left;}
+  th{font-weight:700;}
+  .actions button{margin-right:6px;}
+  #footer-note{display:none;} /* hidden per your request */
+</style>
+</head>
 
-                
-          
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Bike Rental System</h1>
+</header>
+
+<!-- BIKES -->
+<section class="card">
+  <div class="section-title">
+    <h2>Bikes <span id="bikes-count"></span></h2>
+    <div style="display:flex; gap:8px;">
+      <input id="bike-search" placeholder="Search">
+      <select id="bike-sort">
+        <option value="">Sort</option>
+        <option value="hourly_rate">Hourly rate</option>
+      </select>
+      <label style="font-size:14px; color:var(--muted);">
+        <input type="checkbox" id="bike-available-only"> Available only
+      </label>
+      <button id="refresh-bikes">Refresh</button>
+    </div>
+  </div>
+
+  <form id="bike-form" class="inline">
+    <input name="sku" placeholder="SKU" required>
+    <input name="model" placeholder="Model" required>
+    <input name="type" placeholder="Type">
+    <input type="number" name="hourly_rate" placeholder="Rate" required>
+    <button class="primary">Add Bike</button>
+  </form>
+
+  <div id="bikes-list">Loading...</div>
+</section>
+
+<!-- CUSTOMERS -->
+<section class="card">
+  <div class="section-title">
+    <h2>Customers <span id="customers-count"></span></h2>
+    <button id="refresh-customers">Refresh</button>
+  </div>
+
+  <form id="customer-form" class="inline">
+    <input name="name" placeholder="Name" required>
+    <input name="email" placeholder="Email">
+    <input name="phone" placeholder="Phone">
+    <button class="primary">Add Customer</button>
+  </form>
+
+  <div id="customers-list">Loading...</div>
+</section>
+
+<!-- RENTALS -->
+<section class="card">
+  <div class="section-title">
+    <h2>Rentals <span id="rentals-count"></span></h2>
+    <button id="refresh-rentals">Refresh</button>
+  </div>
+
+  <form id="rental-form" class="inline">
+    <select id="select-bike" name="bike_id">
+      <option value="">Bike</option>
+    </select>
+    <select id="select-customer" name="customer_id">
+      <option value="">Customer</option>
+    </select>
+    <input type="datetime-local" name="start_time">
+    <input type="number" name="hourly_rate" placeholder="Rate" required>
+    <button class="primary">Create Rental</button>
+  </form>
+
+  <div id="rentals-list">Loading...</div>
+</section>
+
+<div id="footer-note"></div>
+
+</div>
+
+<script>
+/* (JS is same as your last working version — nothing removed except the note text) */
+
+/* --- Helper shortcuts --- */
+const api = p => '/api' + p;
+const $ = id => document.getElementById(id);
+const html = s => s.replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ----- Load Bikes ----- */
+async function loadBikes(){
+  const res = await fetch(api('/bikes'));
+  const bikes = await res.json();
+  renderBikes(bikes);
+  fillBikeDropdown(bikes);
+}
+function renderBikes(bikes){
+  $('bikes-count').textContent = `(${bikes.length})`;
+  if(!bikes.length){ $('bikes-list').innerHTML="No bikes"; return; }
+  $('bikes-list').innerHTML = `
+    <table><thead>
+      <tr><th>ID</th><th>SKU</th><th>Model</th><th>Type</th><th>Rate</th><th>Status</th><th></th></tr>
+    </thead><tbody>
+      ${bikes.map(b=>`
+        <tr>
+          <td>${b.id}</td>
+          <td>${html(b.sku)}</td>
+          <td>${html(b.model)}</td>
+          <td>${html(b.type)}</td>
+          <td>${b.hourly_rate}</td>
+          <td>${html(b.status)}</td>
+          <td class="actions">
+            <button onclick="editBike(${b.id})">Edit</button>
+            <button onclick="deleteBike(${b.id})">Delete</button>
+          </td>
+        </tr>
+      `).join("")}
+    </tbody></table>`;
+}
+function fillBikeDropdown(bikes){
+  const s = $('select-bike');
+  s.innerHTML = '<option value="">Bike</option>' +
+    bikes.map(b => `<option value="${b.id}">${b.id} — ${html(b.model)}</option>`).join('');
+}
+
+/* create bike */
+$('bike-form').onsubmit = async e=>{
+  e.preventDefault();
+  const f = e.target;
+  const body = {
+    sku:f.sku.value, model:f.model.value, type:f.type.value,
+    hourly_rate:Number(f.hourly_rate.value)
+  };
+  await fetch(api('/bikes'), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  f.reset(); loadBikes();
+};
+
+/* edit bike */
+async function editBike(id){
+  const res = await fetch(api('/bikes/'+id));
+  const b = await res.json();
+  const sku = prompt("SKU", b.sku) || b.sku;
+  const model = prompt("Model", b.model) || b.model;
+  const type = prompt("Type", b.type||'') || b.type;
+  const rate = prompt("Rate", b.hourly_rate) || b.hourly_rate;
+  const status = prompt("Status", b.status) || b.status;
+  await fetch(api('/bikes/'+id), {
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({sku,model,type,hourly_rate:Number(rate),status})
+  });
+  loadBikes();
+}
+
+/* delete bike */
+async function deleteBike(id){
+  if(!confirm("Delete bike?")) return;
+  await fetch(api('/bikes/'+id), {method:'DELETE'});
+  loadBikes();
+}
+
+/* ----- Customers ----- */
+async function loadCustomers(){
+  const res = await fetch(api('/customers'));
+  const c = await res.json();
+  $('customers-count').textContent = `(${c.length})`;
+  $('customers-list').innerHTML = `
+    <table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th></tr></thead>
+    <tbody>${c.map(x=>`<tr><td>${x.id}</td><td>${html(x.name)}</td><td>${html(x.email||'')}</td><td>${html(x.phone||'')}</td></tr>`).join("")}</tbody></table>`;
+  const s = $('select-customer');
+  s.innerHTML = '<option value="">Customer</option>' + c.map(x=>`<option value="${x.id}">${x.id} — ${html(x.name)}</option>`).join('');
+}
+$('customer-form').onsubmit = async e=>{
+  e.preventDefault();
+  const f = e.target;
+  await fetch(api('/customers'),{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:f.name.value,email:f.email.value,phone:f.phone.value})
+  });
+  f.reset(); loadCustomers();
+};
+
+/* ----- Rentals ----- */
+async function loadRentals(){
+  const res = await fetch(api('/rentals'));
+  const r = await res.json();
+  $('rentals-count').textContent = `(${r.length})`;
+  $('rentals-list').innerHTML = `
+    <table>
+      <thead><tr><th>ID</th><th>Bike</th><th>Customer</th><th>Start</th><th>End</th><th>Status</th><th>Total</th><th></th></tr></thead>
+      <tbody>
+        ${r.map(x=>`
+          <tr>
+            <td>${x.id}</td><td>${x.bike_id}</td><td>${x.customer_id}</td>
+            <td>${html(x.start_time)}</td>
+            <td>${html(x.end_time||'—')}</td>
+            <td>${html(x.status)}</td>
+            <td>${x.total_charged ?? '—'}</td>
+            <td>
+              ${x.status==='active'?`<button onclick="returnRental(${x.id})">Return</button>`:''}
+              <button onclick="deleteRental(${x.id})">Delete</button>
+            </td>
+          </tr>`
+        ).join("")}
+      </tbody>
+    </table>`;
+}
+$('rental-form').onsubmit = async e=>{
+  e.preventDefault();
+  const f = e.target;
+  const body = {
+    bike_id:Number(f.bike_id.value),
+    customer_id:Number(f.customer_id.value),
+    start_time:new Date(f.start_time.value).toISOString(),
+    hourly_rate:Number(f.hourly_rate.value)
+  };
+  await fetch(api('/rentals'), {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  f.reset(); loadRentals(); loadBikes();
+};
+async function returnRental(id){
+  const end = prompt("Return time (ISO)", new Date().toISOString());
+  await fetch(api(`/rentals/${id}/return`), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({end_time:end})});
+  loadRentals(); loadBikes();
+}
+async function deleteRental(id){
+  if(!confirm("Delete rental?")) return;
+  await fetch(api('/rentals/'+id), {method:'DELETE'});
+  loadRentals();
+}
+
+/* ----- Init ----- */
+window.onload = ()=>{
+  const t = new Date();
+  const local = new Date(t - t.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  document.querySelector('input[name="start_time"]').value = local;
+  loadBikes(); loadCustomers(); loadRentals();
+};
+</script>
+
+</body>
+</html>
+HTML
+
